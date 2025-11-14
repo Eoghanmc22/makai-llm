@@ -110,7 +110,7 @@
                   LLM_API = cfg.openaiEndpoint;
                   LLM_MODEL = cfg.model;
                   LLM_PROMPT_FILE = ./prompt.txt;
-                  LLM_WORDS_FILE = ./prompt.txt;
+                  LLM_WORDS_FILE = ./words.txt;
                 };
                 serviceConfig = {
                   User = "makai";
