@@ -94,6 +94,14 @@
             };
 
             config = lib.mkIf cfg.enable {
+              users = {
+                users.makai = {
+                  isSystemUser = true;
+                  group = "makai";
+                };
+                groups.makai = { };
+              };
+
               systemd.services.makai = {
                 description = "An inside joke discord bot";
                 wantedBy = [ "multi-user.target" ];
@@ -115,7 +123,7 @@
                   RuntimeDirectory = "makai";
                   RuntimeDirectoryMode = "0755";
                   PrivateTmp = true;
-                  DynamicUser = true;
+                  # DynamicUser = true;
                   DevicePolicy = "closed";
                   LockPersonality = true;
                   MemoryDenyWriteExecute = true;
