@@ -29,7 +29,11 @@ pub async fn run(cmd: &CommandInteraction) -> anyhow::Result<String> {
             ));
         }
 
-        ai::run_llm(&author.name, &message).await
+        ai::run_llm(
+            author.global_name.as_ref().unwrap_or(&author.name),
+            &message,
+        )
+        .await
     } else {
         Ok("ERROR: Got no prompt".to_string())
     }

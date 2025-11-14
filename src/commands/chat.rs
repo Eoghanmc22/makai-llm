@@ -10,7 +10,11 @@ pub async fn run(cmd: &CommandInteraction) -> anyhow::Result<String> {
         ..
     }) = cmd.data.options().first()
     {
-        ai::run_llm(&cmd.user.name, &prompt).await
+        ai::run_llm(
+            cmd.user.global_name.as_ref().unwrap_or(&cmd.user.name),
+            &prompt,
+        )
+        .await
     } else {
         Ok("ERROR: Got no prompt".to_string())
     }
