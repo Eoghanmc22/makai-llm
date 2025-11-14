@@ -1,3 +1,5 @@
+// TODO: Move to qwen-vl-4b, and add image and url support
+
 pub mod ai;
 mod commands;
 
@@ -52,6 +54,11 @@ impl EventHandler for Handler {
 
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
+
+        // let old_commands = Command::get_global_commands(&ctx.http).await;
+        // for old_cmd in old_commands.iter().flatten() {
+        //     let _ = Command::delete_global_command(&ctx.http, old_cmd.id).await;
+        // }
 
         let guild_command1 =
             Command::create_global_command(&ctx.http, commands::chat::register()).await;
