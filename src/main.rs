@@ -72,7 +72,7 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    dotenvy::dotenv().context("Load env vars")?;
+    let _ = dotenvy::dotenv().context("Load env vars");
 
     let subscriber = tracing_subscriber::Registry::default().with(
         tracing_subscriber::fmt::layer().with_filter(
