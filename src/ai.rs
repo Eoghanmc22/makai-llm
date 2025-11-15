@@ -103,9 +103,10 @@ pub async fn run_llm(
     message: MakaiMessage,
 ) -> anyhow::Result<LlmResponse> {
     let url = env::var("LLM_API").context("Expected a llm api url in env")?;
+    let api_key = env::var("LLM_API_KEY").unwrap_or_else(|_| "fake-api-key".to_string());
     let model = env::var("LLM_MODEL").context("Expected a llm model in env")?;
-    let prompt_file = env::var("LLM_PROMPT_FILE").context("Expected a prompt file in env")?;
-    let words_file = env::var("LLM_WORDS_FILE").context("Expected a words file in env")?;
+    let prompt_file = env::var("LLM_PROMPT_FILE").unwrap_or_else(|_| "./prompt.txt".to_string());
+    let words_file = env::var("LLM_WORDS_FILE").unwrap_or_else(|_| "./words.txt".to_string());
 
     let system = tokio::fs::read_to_string(prompt_file)
         .await
@@ -125,7 +126,7 @@ pub async fn run_llm(
 
     let llm = LLMBuilder::new()
         .backend(LLMBackend::OpenAI)
-        .api_key("funny-api-key")
+        .api_key(api_key)
         .base_url(url)
         .model(model)
         .system(system)
