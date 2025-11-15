@@ -8,6 +8,7 @@
 pub mod ai;
 pub mod commands;
 pub mod context;
+pub mod utils;
 
 use std::env;
 
@@ -43,25 +44,6 @@ impl EventHandler for Handler<'_> {
             if let Err(err) = res {
                 error!("Error while handeling command: {err}");
             }
-
-            // let content = match command.data.name.as_str() {
-            //     "chat" => commands::chat::run(&command).await,
-            //     "Reply" => commands::reply::run(&command).await,
-            //     _ => Ok("not implemented :(".to_string()),
-            // };
-            //
-            // let content = match content {
-            //     Ok(content) => content,
-            //     Err(err) => {
-            //         error!("Hit an error: {err:?}");
-            //         "An error occoured while processing your command!".to_string()
-            //     }
-            // };
-            //
-            // let builder = CreateInteractionResponseFollowup::new().content(content);
-            // if let Err(why) = command.create_followup(&ctx.http, builder).await {
-            //     println!("Cannot respond to slash command 2: {why}");
-            // }
         }
     }
 
@@ -72,6 +54,8 @@ impl EventHandler for Handler<'_> {
             .register_command(ctx)
             .await
             .expect("Register Commands");
+
+        self.context.set_user(ready.user.into());
 
         println!("Commands registered");
     }

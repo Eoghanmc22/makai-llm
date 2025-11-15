@@ -1,8 +1,13 @@
+use anyhow::Context as _;
 use async_trait::async_trait;
-use serenity::all::{CommandInteraction, CommandType, Context, InteractionContext, Message};
+use serenity::all::{
+    CacheHttp, CommandInteraction, CommandType, Context, CreateInteractionResponse,
+    CreateInteractionResponseFollowup, CreateInteractionResponseMessage, InteractionContext,
+    Message,
+};
 use serenity::builder::CreateCommand;
 
-use crate::ai;
+use crate::ai::{self, MakaiMessage};
 use crate::commands::{CommandName, MakaiCommand};
 use crate::context::MakaiContext;
 
@@ -28,38 +33,28 @@ impl MakaiCommand for ReplyCommand {
         discord_ctx: Context,
         cmd: &CommandInteraction,
     ) -> anyhow::Result<()> {
-        if let Some(Message {
-            author,
-            content,
-            embeds,
-            ..
-        }) = cmd.data.resolved.messages.values().next()
-        {
-            let mut message = content.clone();
-
-            for embed in embeds {
-                message.push_str(&format!(
-                    "\nThe user's message included a link: Title: `{}`, Description: `{}`",
-                    embed
-                        .title
-                        .as_ref()
-                        .map(|it| it.as_str())
-                        .unwrap_or("Unknown"),
-                    embed
-                        .description
-                        .as_ref()
-                        .map(|it| it.as_str())
-                        .unwrap_or("Unknown")
-                ));
-            }
-
-            ai::run_llm(
-                author.global_name.as_ref().unwrap_or(&author.name),
-                &message,
-            )
+        let defer = CreateInteractionResponse::Defer(CreateInteractionResponseMessage::default());
+        cmd.create_response(&discord_ctx.http, defer)
             .await
-        } else {
-            Ok("ERROR: Got no prompt".to_string())
-        }
+            .context("Cannot defer command")?;
+
+        let user = bot_ctx
+            .user()
+            .await
+            .context("Got command before user is known")?;
+
+        let message =
+            MakaiMessage::from_message_command(user.id, cmd).context("Get message from command")?;
+
+        let response = ai::run_llm(&*bot_ctx.channel(&cmd.channel_id).await, message)
+            .await
+            .context("Run LLM")?;
+
+        let follow_up = CreateInteractionResponseFollowup::default().content(response);
+        cmd.create_followup(discord_ctx.http(), follow_up)
+            .await
+            .context("Cannot followup command")?;
+
+        Ok(())
     }
 }
