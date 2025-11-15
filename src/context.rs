@@ -67,7 +67,8 @@ impl MakaiContextChannel {
     }
 
     pub async fn chat_messages(&self, count: usize) -> Vec<ChatMessage> {
-        self.messages
+        let mut vec = self
+            .messages
             .read()
             .await
             .values()
@@ -78,7 +79,15 @@ impl MakaiContextChannel {
             // Convert them to chat messages
             .map(MakaiMessage::to_chat_message)
             // Make into a vector
-            .collect()
+            .collect::<Vec<_>>();
+
+        vec.push(
+            ChatMessage::user()
+                .content("<END OF MESSAGE HISTORY>")
+                .build(),
+        );
+
+        vec
     }
 }
 

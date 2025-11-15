@@ -139,8 +139,6 @@ pub async fn run_llm(
     let response = llm.chat(&messages).await.context("LLM Error")?;
     let text = response.text().unwrap_or_default();
 
-    // println!("{response:?}");
-
     // Update stored context
     ctx.add_message(message).await;
     ctx.add_message(MakaiMessage::from_assistant_response(text.clone()))
