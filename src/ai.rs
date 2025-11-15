@@ -127,7 +127,7 @@ pub async fn run_llm(ctx: &MakaiContextChannel, message: MakaiMessage) -> anyhow
         .build()
         .context("Failed to build LLM")?;
 
-    let mut messages = ctx.chat_messages().await;
+    let mut messages = ctx.chat_messages(20).await;
     messages.push(message.to_chat_message());
 
     let response = llm.chat(&messages).await.context("LLM Error")?;

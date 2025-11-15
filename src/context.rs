@@ -1,6 +1,8 @@
 use std::{
     collections::{BTreeMap, HashMap},
+    mem::take,
     sync::Arc,
+    usize,
 };
 
 use chrono::{DateTime, Utc};
@@ -65,12 +67,18 @@ impl MakaiContextChannel {
             .insert(message.timestamp, message);
     }
 
-    pub async fn chat_messages(&self) -> Vec<ChatMessage> {
+    pub async fn chat_messages(&self, count: usize) -> Vec<ChatMessage> {
         self.messages
             .read()
             .await
             .values()
+            // Get the last `count` messages
+            .rev()
+            .take(count)
+            .rev()
+            // Convert them to chat messages
             .map(MakaiMessage::to_chat_message)
+            // Make into a vector
             .collect()
     }
 }
