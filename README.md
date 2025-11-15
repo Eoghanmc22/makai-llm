@@ -1,8 +1,8 @@
-= MakAI LLM
+# MakAI LLM
 
 An inside joke discord bot that behaves like some of my friends
 
-== Local Development
+## Local Development
 
 - Install a recent version of rust/cargo
 - Create a `.env` file with the following content:
