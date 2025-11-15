@@ -168,7 +168,8 @@ impl LlmResponse {
         let content = if let Some(usage) = &self.usage {
             &format!(
                 "{}\n-# Generated {} tokens",
-                self.response, usage.completion_tokens
+                self.response.trim(),
+                usage.completion_tokens
             )
         } else {
             &self.response
