@@ -1,72 +1,79 @@
-// TODO: Move to qwen-vl-4b, and add image and url support
+// TODO: Load/Save context
+//
+// TODO: Move to a vision model (llama 4?, qwen? gemma?), and add image and url support
+// TODO: Remember Context
+// TODO: add to context command
+// TODO: Show thoughts option
 
 pub mod ai;
-mod commands;
+pub mod commands;
+pub mod context;
 
 use std::env;
 
 use anyhow::Context as _;
-use serenity::all::CreateInteractionResponseFollowup;
 use tracing::error;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{EnvFilter, Layer, layer::SubscriberExt};
 
 use serenity::async_trait;
-use serenity::builder::{CreateInteractionResponse, CreateInteractionResponseMessage};
-use serenity::model::application::{Command, Interaction};
+use serenity::model::application::Interaction;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 
-struct Handler;
+use crate::commands::MakaiCommandRegistry;
+use crate::context::MakaiContext;
+
+struct Handler<'a> {
+    commands: MakaiCommandRegistry<'a>,
+    context: MakaiContext,
+}
 
 #[async_trait]
-impl EventHandler for Handler {
+impl EventHandler for Handler<'_> {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::Command(command) = interaction {
             println!("Received command interaction: {command:#?}");
 
-            let data = CreateInteractionResponseMessage::new().content("Processing...");
-            let builder = CreateInteractionResponse::Defer(data);
-            if let Err(why) = command.create_response(&ctx.http, builder).await {
-                println!("Cannot respond to slash command 1: {why}");
+            let res = self
+                .commands
+                .handle_command(&self.context, ctx, &command)
+                .await;
+
+            if let Err(err) = res {
+                error!("Error while handeling command: {err}");
             }
 
-            let content = match command.data.name.as_str() {
-                "chat" => commands::chat::run(&command).await,
-                "Reply" => commands::reply::run(&command).await,
-                _ => Ok("not implemented :(".to_string()),
-            };
-
-            let content = match content {
-                Ok(content) => content,
-                Err(err) => {
-                    error!("Hit an error: {err:?}");
-                    "An error occoured while processing your command!".to_string()
-                }
-            };
-
-            let builder = CreateInteractionResponseFollowup::new().content(content);
-            if let Err(why) = command.create_followup(&ctx.http, builder).await {
-                println!("Cannot respond to slash command 2: {why}");
-            }
+            // let content = match command.data.name.as_str() {
+            //     "chat" => commands::chat::run(&command).await,
+            //     "Reply" => commands::reply::run(&command).await,
+            //     _ => Ok("not implemented :(".to_string()),
+            // };
+            //
+            // let content = match content {
+            //     Ok(content) => content,
+            //     Err(err) => {
+            //         error!("Hit an error: {err:?}");
+            //         "An error occoured while processing your command!".to_string()
+            //     }
+            // };
+            //
+            // let builder = CreateInteractionResponseFollowup::new().content(content);
+            // if let Err(why) = command.create_followup(&ctx.http, builder).await {
+            //     println!("Cannot respond to slash command 2: {why}");
+            // }
         }
     }
 
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
 
-        // let old_commands = Command::get_global_commands(&ctx.http).await;
-        // for old_cmd in old_commands.iter().flatten() {
-        //     let _ = Command::delete_global_command(&ctx.http, old_cmd.id).await;
-        // }
+        self.commands
+            .register_command(ctx)
+            .await
+            .expect("Register Commands");
 
-        let guild_command1 =
-            Command::create_global_command(&ctx.http, commands::chat::register()).await;
-        let guild_command2 =
-            Command::create_global_command(&ctx.http, commands::reply::register()).await;
-
-        println!("I created the following global slash command: {guild_command1:#?}");
-        println!("I created the following global slash command: {guild_command2:#?}");
+        println!("Commands registered");
     }
 }
 
@@ -88,7 +95,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Build our client.
     let mut client = Client::builder(token, GatewayIntents::empty())
-        .event_handler(Handler)
+        .event_handler(Handler {
+            commands: MakaiCommandRegistry::default(),
+            context: MakaiContext::default(),
+        })
         .await
         .expect("Error creating client");
 

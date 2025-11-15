@@ -1,17 +1,17 @@
+use anyhow::bail;
 use async_trait::async_trait;
 use serenity::all::{CommandInteraction, CommandType, Context, InteractionContext, Message};
 use serenity::builder::CreateCommand;
 
-use crate::ai;
 use crate::commands::{CommandName, MakaiCommand};
 use crate::context::MakaiContext;
 
-pub struct ReplyCommand;
+pub struct RememberCommand;
 
 #[async_trait]
-impl MakaiCommand for ReplyCommand {
+impl MakaiCommand for RememberCommand {
     fn name(&self) -> CommandName {
-        "Reply"
+        "Remember"
     }
 
     fn register(&self) -> CreateCommand {
@@ -35,29 +35,7 @@ impl MakaiCommand for ReplyCommand {
             ..
         }) = cmd.data.resolved.messages.values().next()
         {
-            let mut message = content.clone();
-
-            for embed in embeds {
-                message.push_str(&format!(
-                    "\nThe user's message included a link: Title: `{}`, Description: `{}`",
-                    embed
-                        .title
-                        .as_ref()
-                        .map(|it| it.as_str())
-                        .unwrap_or("Unknown"),
-                    embed
-                        .description
-                        .as_ref()
-                        .map(|it| it.as_str())
-                        .unwrap_or("Unknown")
-                ));
-            }
-
-            ai::run_llm(
-                author.global_name.as_ref().unwrap_or(&author.name),
-                &message,
-            )
-            .await
+            bail!("TODO");
         } else {
             Ok("ERROR: Got no prompt".to_string())
         }
