@@ -1,14 +1,18 @@
-use std::env;
+use std::{borrow::Cow, env};
 
-use anyhow::Context;
+use anyhow::Context as _;
 use chrono::{DateTime, Utc};
+use itertools::Itertools;
 use llm::{
     builder::{LLMBackend, LLMBuilder},
-    chat::ChatMessage,
+    chat::{ChatMessage, Usage},
 };
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
-use serenity::all::{CommandInteraction, Message, MessageId, UserId};
+use serenity::all::{
+    CacheHttp, CommandInteraction, Context, CreateAttachment, CreateInteractionResponseFollowup,
+    Message, MessageId, UserId,
+};
 
 use crate::{context::MakaiContextChannel, utils::user_to_name};
 
@@ -95,7 +99,10 @@ impl MakaiMessage {
     }
 }
 
-pub async fn run_llm(ctx: &MakaiContextChannel, message: MakaiMessage) -> anyhow::Result<String> {
+pub async fn run_llm(
+    ctx: &MakaiContextChannel,
+    message: MakaiMessage,
+) -> anyhow::Result<LlmResponse> {
     let url = env::var("LLM_API").context("Expected a llm api url in env")?;
     let model = env::var("LLM_MODEL").context("Expected a llm model in env")?;
     let prompt_file = env::var("LLM_PROMPT_FILE").context("Expected a prompt file in env")?;
@@ -122,7 +129,6 @@ pub async fn run_llm(ctx: &MakaiContextChannel, message: MakaiMessage) -> anyhow
         .api_key("funny-api-key")
         .base_url(url)
         .model(model)
-        .max_tokens(512)
         .system(system)
         .build()
         .context("Failed to build LLM")?;
@@ -131,16 +137,91 @@ pub async fn run_llm(ctx: &MakaiContextChannel, message: MakaiMessage) -> anyhow
     messages.push(message.to_chat_message());
 
     let response = llm.chat(&messages).await.context("LLM Error")?;
-
-    // Get rid of thinking stuff
     let text = response.text().unwrap_or_default();
-    let text = text.split("▷").last();
-    let text = text.unwrap_or_default().to_string();
+
+    // println!("{response:?}");
 
     // Update stored context
     ctx.add_message(message).await;
     ctx.add_message(MakaiMessage::from_assistant_response(text.clone()))
         .await;
 
-    Ok(text)
+    Ok(LlmResponse {
+        response: text,
+        usage: response.usage(),
+    })
+}
+
+pub struct LlmResponse {
+    pub response: String,
+    pub usage: Option<Usage>,
+}
+
+impl LlmResponse {
+    pub async fn send_follow_up(
+        &self,
+        discord_ctx: Context,
+        cmd: &CommandInteraction,
+    ) -> anyhow::Result<()> {
+        let content = if let Some(usage) = &self.usage {
+            &format!(
+                "{}\n-# Generated {} tokens",
+                self.response, usage.completion_tokens
+            )
+        } else {
+            &self.response
+        };
+        let follow_up = CreateInteractionResponseFollowup::default().content(content);
+        let res1 = cmd
+            .create_followup(discord_ctx.http(), follow_up)
+            .await
+            .context("Cannot followup command");
+
+        if let Err(_) = res1 {
+            let word_wrapped = self
+                .response
+                .lines()
+                .map(|it| {
+                    if it.len() > 100 {
+                        let mut cumlative_buf = String::new();
+                        let mut line_buf = String::new();
+
+                        for word in it.split_whitespace() {
+                            line_buf.push_str(word);
+                            if line_buf.len() > 70 {
+                                line_buf.push('\n');
+                                cumlative_buf.push_str(&line_buf);
+                                line_buf.clear();
+                            } else {
+                                line_buf.push(' ');
+                            }
+                        }
+                        cumlative_buf.push_str(&line_buf);
+                        Cow::Owned(cumlative_buf)
+                    } else {
+                        Cow::Borrowed(it)
+                    }
+                })
+                .fold(String::new(), |mut acc, chunk| {
+                    acc.push_str(chunk.trim());
+                    acc.push('\n');
+                    acc
+                });
+
+            let follow_up = CreateInteractionResponseFollowup::default()
+                .add_file(CreateAttachment::bytes(word_wrapped.as_bytes(), "raw.txt"));
+
+            let follow_up = if let Some(usage) = &self.usage {
+                follow_up.content(format!("-# Generated {} tokens", usage.completion_tokens))
+            } else {
+                follow_up
+            };
+
+            cmd.create_followup(discord_ctx.http(), follow_up)
+                .await
+                .context("Cannot followup command")?;
+        }
+
+        Ok(())
+    }
 }

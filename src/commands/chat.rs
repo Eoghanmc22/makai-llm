@@ -2,9 +2,8 @@ use anyhow::{Context as _, bail};
 use chrono::Utc;
 use llm::async_trait;
 use serenity::all::{
-    CacheHttp, CommandInteraction, Context, CreateInteractionResponse,
-    CreateInteractionResponseFollowup, CreateInteractionResponseMessage, InteractionContext,
-    ResolvedOption, ResolvedValue,
+    CommandInteraction, Context, CreateInteractionResponse, CreateInteractionResponseMessage,
+    InteractionContext, ResolvedOption, ResolvedValue,
 };
 use serenity::builder::{CreateCommand, CreateCommandOption};
 use serenity::model::application::CommandOptionType;
@@ -63,11 +62,10 @@ impl MakaiCommand for ChatCommand {
         let response = ai::run_llm(&*bot_ctx.channel(&cmd.channel_id).await, message)
             .await
             .context("Run LLM")?;
-
-        let follow_up = CreateInteractionResponseFollowup::default().content(response);
-        cmd.create_followup(discord_ctx.http(), follow_up)
+        response
+            .send_follow_up(discord_ctx, cmd)
             .await
-            .context("Cannot followup command")?;
+            .context("Send Follow up")?;
 
         Ok(())
     }
