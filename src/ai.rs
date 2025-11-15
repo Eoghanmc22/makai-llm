@@ -2,7 +2,6 @@ use std::{borrow::Cow, env};
 
 use anyhow::Context as _;
 use chrono::{DateTime, Utc};
-use itertools::Itertools;
 use llm::{
     builder::{LLMBackend, LLMBuilder},
     chat::{ChatMessage, Usage},
@@ -135,6 +134,11 @@ pub async fn run_llm(
 
     let mut messages = ctx.chat_messages(20).await;
     messages.push(message.to_chat_message());
+    messages.push(
+        ChatMessage::user()
+            .content("Generate a makian reply to the previous message.")
+            .build(),
+    );
 
     let response = llm.chat(&messages).await.context("LLM Error")?;
     let text = response.text().unwrap_or_default();
