@@ -1,5 +1,5 @@
 use anyhow::{Context as _, bail};
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use llm::async_trait;
 use serenity::all::{
     CacheHttp, CommandInteraction, Context, CreateInteractionResponse,
@@ -44,11 +44,6 @@ impl MakaiCommand for ChatCommand {
         cmd.create_response(&discord_ctx.http, defer)
             .await
             .context("Cannot defer command")?;
-
-        let user = bot_ctx
-            .user()
-            .await
-            .context("Got command before user is known")?;
 
         let options = cmd.data.options();
         let Some(ResolvedOption {

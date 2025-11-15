@@ -3,7 +3,6 @@ use async_trait::async_trait;
 use serenity::all::{
     CacheHttp, CommandInteraction, CommandType, Context, CreateInteractionResponse,
     CreateInteractionResponseFollowup, CreateInteractionResponseMessage, InteractionContext,
-    Message,
 };
 use serenity::builder::CreateCommand;
 

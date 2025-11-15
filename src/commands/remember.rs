@@ -1,10 +1,11 @@
 use anyhow::Context as _;
 use async_trait::async_trait;
 use serenity::all::{
-    CacheHttp, CommandInteraction, CommandType, Context, CreateInteractionResponse,
-    InteractionContext,
+    CommandInteraction, CommandType, Context, CreateInteractionResponse,
+    CreateInteractionResponseMessage, InteractionContext, InteractionResponseFlags,
 };
 use serenity::builder::CreateCommand;
+use tracing::error;
 
 use crate::ai::MakaiMessage;
 use crate::commands::{CommandName, MakaiCommand};
@@ -32,9 +33,12 @@ impl MakaiCommand for RememberCommand {
         discord_ctx: Context,
         cmd: &CommandInteraction,
     ) -> anyhow::Result<()> {
-        let defer = CreateInteractionResponse::Acknowledge;
-        if let Err(err) = cmd.create_response(&discord_ctx.http, defer).await {
-            println!("Cannot ack command: {err}");
+        let message = CreateInteractionResponseMessage::default()
+            .flags(InteractionResponseFlags::EPHEMERAL)
+            .content("Added to memory");
+        let response = CreateInteractionResponse::Message(message);
+        if let Err(err) = cmd.create_response(&discord_ctx.http, response).await {
+            error!("Cannot ack command: {err:?}");
         }
 
         let user = bot_ctx
@@ -45,17 +49,11 @@ impl MakaiCommand for RememberCommand {
         let message =
             MakaiMessage::from_message_command(user.id, cmd).context("Get message from command")?;
 
-        discord_ctx
-            .http()
-            .create_reaction(
-                cmd.channel_id,
-                message.message_id.context("Get message id")?,
-                &'👍'.into(),
-            )
+        bot_ctx
+            .channel(&cmd.channel_id)
             .await
-            .context("Add reaction")?;
-
-        bot_ctx.channel(&cmd.channel_id).await.add_message(message);
+            .add_message(message)
+            .await;
 
         Ok(())
     }

@@ -1,10 +1,11 @@
 use anyhow::Context as _;
 use async_trait::async_trait;
 use std::collections::HashMap;
+use tracing::error;
 
 use serenity::all::{
     Command, CommandInteraction, Context, CreateCommand, CreateInteractionResponse,
-    CreateInteractionResponseMessage, InteractionResponseFlags,
+    CreateInteractionResponseFollowup, CreateInteractionResponseMessage, InteractionResponseFlags,
 };
 
 use crate::{
@@ -67,15 +68,24 @@ impl<'a> MakaiCommandRegistry<'a> {
                 .content("not implemented :(");
             let defer = CreateInteractionResponse::Message(builder);
             if let Err(err) = interaction.create_response(&discord_ctx.http, defer).await {
-                println!("Cannot defer to slash command: {err}");
+                error!("Cannot defer to slash command: {err:?}");
             }
 
             return Ok(());
         };
 
-        cmd.run(bot_ctx, discord_ctx, interaction).await?;
+        let res = cmd.run(bot_ctx, discord_ctx.clone(), interaction).await;
 
-        todo!()
+        if let Err(_) = res {
+            let follow_up = CreateInteractionResponseFollowup::default()
+                .content("An error occoured while processing your command!");
+            interaction
+                .create_followup(&discord_ctx.http, follow_up)
+                .await
+                .context("Cannot followup command")?;
+        }
+
+        res
     }
 }
 

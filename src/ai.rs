@@ -7,13 +7,12 @@ use llm::{
     chat::ChatMessage,
 };
 use rand::seq::SliceRandom;
-use serenity::all::{CommandInteraction, Message, MessageId, User, UserId};
+use serde::{Deserialize, Serialize};
+use serenity::all::{CommandInteraction, Message, MessageId, UserId};
 
-use crate::{
-    context::{MakaiContext, MakaiContextChannel},
-    utils::user_to_name,
-};
+use crate::{context::MakaiContextChannel, utils::user_to_name};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MakaiMessage {
     pub message_id: Option<MessageId>,
     pub timestamp: DateTime<Utc>,
@@ -21,6 +20,7 @@ pub struct MakaiMessage {
     pub content: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MessageSender {
     MakaiBot,
     User(String),
@@ -74,6 +74,15 @@ impl MakaiMessage {
         }
     }
 
+    pub fn from_assistant_response(content: String) -> Self {
+        Self {
+            message_id: None,
+            timestamp: Utc::now(),
+            sender: MessageSender::MakaiBot,
+            content,
+        }
+    }
+
     pub fn to_chat_message(&self) -> ChatMessage {
         match &self.sender {
             MessageSender::MakaiBot => ChatMessage::assistant()
@@ -108,8 +117,6 @@ pub async fn run_llm(ctx: &MakaiContextChannel, message: MakaiMessage) -> anyhow
         }),
     );
 
-    println!("{system}");
-
     let llm = LLMBuilder::new()
         .backend(LLMBackend::OpenAI)
         .api_key("funny-api-key")
@@ -122,15 +129,18 @@ pub async fn run_llm(ctx: &MakaiContextChannel, message: MakaiMessage) -> anyhow
 
     let mut messages = ctx.chat_messages().await;
     messages.push(message.to_chat_message());
-    ctx.add_message(message);
 
     let response = llm.chat(&messages).await.context("LLM Error")?;
-
-    println!("AI responded: `{:?}`", response.text());
 
     // Get rid of thinking stuff
     let text = response.text().unwrap_or_default();
     let text = text.split("▷").last();
+    let text = text.unwrap_or_default().to_string();
 
-    Ok(text.unwrap_or_default().to_string())
+    // Update stored context
+    ctx.add_message(message).await;
+    ctx.add_message(MakaiMessage::from_assistant_response(text.clone()))
+        .await;
+
+    Ok(text)
 }

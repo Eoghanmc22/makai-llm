@@ -43,6 +43,15 @@ impl MakaiContext {
     }
 }
 
+impl Clone for MakaiContext {
+    fn clone(&self) -> Self {
+        tokio::task::block_in_place(|| Self {
+            channels: RwLock::new(self.channels.blocking_read().clone()),
+            bot_user: RwLock::new(self.bot_user.blocking_read().clone()),
+        })
+    }
+}
+
 #[derive(Default)]
 pub struct MakaiContextChannel {
     messages: RwLock<BTreeMap<DateTime<Utc>, MakaiMessage>>,
@@ -63,5 +72,80 @@ impl MakaiContextChannel {
             .values()
             .map(MakaiMessage::to_chat_message)
             .collect()
+    }
+}
+
+impl Clone for MakaiContextChannel {
+    fn clone(&self) -> Self {
+        tokio::task::block_in_place(|| Self {
+            messages: RwLock::new(self.messages.blocking_read().clone()),
+        })
+    }
+}
+
+pub mod serde {
+    use ::serde::{Deserialize, Serialize};
+
+    use super::*;
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct MakaiContextSerde {
+        channels: HashMap<ChannelId, MakaiContextChannelSerde>,
+        bot_user: Option<User>,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct MakaiContextChannelSerde {
+        messages: BTreeMap<DateTime<Utc>, MakaiMessage>,
+    }
+
+    impl From<MakaiContextChannel> for MakaiContextChannelSerde {
+        fn from(value: MakaiContextChannel) -> Self {
+            let MakaiContextChannel { messages } = value;
+
+            MakaiContextChannelSerde {
+                messages: messages.into_inner(),
+            }
+        }
+    }
+
+    impl From<MakaiContextChannelSerde> for MakaiContextChannel {
+        fn from(value: MakaiContextChannelSerde) -> Self {
+            let MakaiContextChannelSerde { messages } = value;
+
+            MakaiContextChannel {
+                messages: messages.into(),
+            }
+        }
+    }
+
+    impl From<MakaiContext> for MakaiContextSerde {
+        fn from(value: MakaiContext) -> Self {
+            let MakaiContext { channels, bot_user } = value;
+
+            MakaiContextSerde {
+                channels: channels
+                    .into_inner()
+                    .into_iter()
+                    .map(|(channel, ctx)| (channel, Arc::unwrap_or_clone(ctx).into()))
+                    .collect(),
+                bot_user: bot_user.into_inner(),
+            }
+        }
+    }
+
+    impl From<MakaiContextSerde> for MakaiContext {
+        fn from(value: MakaiContextSerde) -> Self {
+            let MakaiContextSerde { channels, bot_user } = value;
+
+            MakaiContext {
+                channels: channels
+                    .into_iter()
+                    .map(|(channel, ctx)| (channel, Arc::new(ctx.into())))
+                    .collect::<HashMap<_, _>>()
+                    .into(),
+                bot_user: bot_user.into(),
+            }
+        }
     }
 }
