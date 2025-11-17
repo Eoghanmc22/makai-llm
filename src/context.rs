@@ -66,6 +66,10 @@ impl MakaiContextChannel {
             .insert(message.timestamp, message);
     }
 
+    pub async fn clear(&self) {
+        self.messages.write().await.clear();
+    }
+
     pub async fn chat_messages(&self, count: usize) -> Vec<ChatMessage> {
         let mut vec = self
             .messages

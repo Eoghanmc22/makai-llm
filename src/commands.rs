@@ -9,13 +9,16 @@ use serenity::all::{
 };
 
 use crate::{
-    commands::{chat::ChatCommand, remember::RememberCommand, reply::ReplyCommand},
+    commands::{
+        chat::ChatCommand, remember::RememberCommand, reply::ReplyCommand, reset::ResetCommand,
+    },
     context::MakaiContext,
 };
 
 pub mod chat;
 pub mod remember;
 pub mod reply;
+pub mod reset;
 
 pub type CommandName = &'static str;
 
@@ -96,6 +99,7 @@ impl Default for MakaiCommandRegistry<'_> {
         reg.add_command(ReplyCommand);
         reg.add_command(ChatCommand);
         reg.add_command(RememberCommand);
+        reg.add_command(ResetCommand);
 
         reg
     }
